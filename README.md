@@ -7,8 +7,7 @@ Network Resources Injector is a Kubernetes Dynamic Admission Controller applicat
 To quickly build and deploy admission controller run:
 ```
 make image
-kubectl apply -f deployments/auth.yaml \
-              -f deployments/server.yaml
+./scripts/webhook-deployment.sh
 ```
 For full installation and troubleshooting steps please see [Installation guide](docs/installation.md).
 

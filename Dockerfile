@@ -20,6 +20,5 @@ RUN apk add --update --virtual build-dependencies build-base linux-headers && \
 
 FROM golang:1.12-alpine
 COPY --from=builder /usr/src/network-resources-injector/bin/webhook /usr/bin/
-COPY --from=builder /usr/src/network-resources-injector/bin/installer /usr/bin/
 
 CMD ["webhook"]

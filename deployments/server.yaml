@@ -18,7 +18,6 @@ metadata:
   labels:
     app: network-resources-injector
   name: network-resources-injector
-  namespace: kube-system
 spec:
   serviceAccount: network-resources-injector-sa
   containers:
@@ -30,25 +29,14 @@ spec:
     args:
     - -bind-address=0.0.0.0
     - -port=443
-    - -tls-private-key-file=/etc/tls/tls.key
-    - -tls-cert-file=/etc/tls/tls.crt
+    - -tls-private-key-file=/etc/tls/key.pem
+    - -tls-cert-file=/etc/tls/cert.pem
     - -alsologtostderr=true
     volumeMounts:
     - mountPath: /etc/tls
       name: tls
-  initContainers:
-  - name: installer
-    image: network-resources-injector:latest
-    imagePullPolicy: IfNotPresent
-    command:
-    - installer
-    args:
-    - -name=network-resources-injector
-    - -namespace=kube-system
-    - -alsologtostderr
-    volumeMounts:
-    - name: tls
-      mountPath: /etc/tls
+      readOnly: True
   volumes:
   - name: tls
-    emptyDir: {}
+    secret:
+      secretName: network-resources-injector-secret

@@ -13,5 +13,4 @@ export GOBIN=${PWD}/bin
 export CGO_ENABLED=0
 export GO15VENDOREXPERIMENT=1
 
-go install -tags no_openssl "$@" ${REPO_PATH}/cmd/installer
 go install -tags no_openssl "$@" ${REPO_PATH}/cmd/webhook
