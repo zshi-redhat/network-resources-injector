@@ -15,16 +15,15 @@
 package main
 
 import (
-	"context"
-	"crypto/sha512"
-	"encoding/hex"
+	"crypto/tls"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"time"
+	"os"
+	"syscall"
 
 	"github.com/golang/glog"
+	"github.com/fsnotify/fsnotify"
 	"github.com/intel/network-resources-injector/pkg/webhook"
 )
 
@@ -38,49 +37,65 @@ func main() {
 
 	glog.Infof("starting mutating admission controller for network resources injection")
 
+	keyPair, err := webhook.NewTlsKeypairReloader(*cert, *key)
+	if err != nil {
+		glog.Fatalf("error load certificate: %s", err.Error())
+	}
+
+	proc, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		glog.Fatalf("error to get process info: %s", err.Error())
+	}
+
 	/* init API client */
 	webhook.SetupInClusterClient()
 
-	/* register handlers */
-	var httpServer *http.Server
-	http.HandleFunc("/mutate", webhook.MutateHandler)
-
-	/* start webhook server */
 	go func() {
-		for {
-			httpServer = &http.Server{
-				Addr: fmt.Sprintf("%s:%d", *address, *port),
-			}
-			err := httpServer.ListenAndServeTLS(*cert, *key)
-			if err != nil {
-				if err == http.ErrServerClosed {
-					glog.Info("restarting server")
-					continue
-				} else {
-					glog.Fatalf("error starting web server: %s", err.Error())
-					break
-				}
-			}
+		/* register handlers */
+		var httpServer *http.Server
+		http.HandleFunc("/mutate", webhook.MutateHandler)
+
+		/* start serving */
+		httpServer = &http.Server{
+			Addr: fmt.Sprintf("%s:%d", *address, *port),
+			TLSConfig: &tls.Config{
+				GetCertificate: keyPair.GetCertificateFunc(),
+			},
+		}
+
+		err := httpServer.ListenAndServeTLS("", "")
+		if err != nil {
+			glog.Fatalf("error starting web server: %v", err)
 		}
 	}()
 
 	/* watch the cert file and restart http sever if the file updated. */
-	oldHashVal := ""
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		glog.Error(err)
+	}
+	defer watcher.Close()
+	watcher.Add(*cert)
+	watcher.Add(*key)
+
 	for {
-		hasher := sha512.New()
-		s, err := ioutil.ReadFile(*cert)
-		hasher.Write(s)
-		if err != nil {
-			glog.Fatalf("failed to read file %s: %s", *cert, err)
-		}
-		newHashVal := hex.EncodeToString(hasher.Sum(nil))
-		if oldHashVal != "" && newHashVal != oldHashVal {
-			glog.Info("get cert file update")
-			if err := httpServer.Shutdown(context.Background()); err != nil {
-				glog.Fatalf("http server shutdown: %v", err)
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				continue
 			}
+			glog.Info("watcher event: %v", event)
+			if event.Op & fsnotify.Write == fsnotify.Write {
+				glog.Info("modified file: %v", event.Name)
+				if err := proc.Signal(syscall.SIGHUP); err != nil {
+					glog.Fatalf("failed to send certificate update notification: %v", err)
+				}
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				continue
+			}
+			glog.Info("watcher error: %v", err)
 		}
-		oldHashVal = newHashVal
-		time.Sleep(1 * time.Second)
 	}
 }
