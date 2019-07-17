@@ -75,18 +75,22 @@ func main() {
 		glog.Error(err)
 	}
 	defer watcher.Close()
-	watcher.Add(*cert)
-	watcher.Add(*key)
 
 	for {
+		watcher.Add(*cert)
+		watcher.Add(*key)
+
 		select {
 		case event, ok := <-watcher.Events:
 			if !ok {
 				continue
 			}
-			glog.Info("watcher event: %v", event)
-			if event.Op & fsnotify.Write == fsnotify.Write {
-				glog.Info("modified file: %v", event.Name)
+			glog.Infof("watcher event: %v", event)
+			if event.Op & fsnotify.Write == fsnotify.Create ||
+				event.Op & fsnotify.Write == fsnotify.Rename ||
+				event.Op & fsnotify.Write == fsnotify.Remove ||
+				event.Op & fsnotify.Write == fsnotify.Write {
+				glog.Infof("modified file: %v", event.Name)
 				if err := proc.Signal(syscall.SIGHUP); err != nil {
 					glog.Fatalf("failed to send certificate update notification: %v", err)
 				}
@@ -95,7 +99,7 @@ func main() {
 			if !ok {
 				continue
 			}
-			glog.Info("watcher error: %v", err)
+			glog.Infof("watcher error: %v", err)
 		}
 	}
 }
