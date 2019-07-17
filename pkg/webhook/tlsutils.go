@@ -16,10 +16,7 @@ package webhook
 
 import (
 	"crypto/tls"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 
 	"github.com/golang/glog"
 )
@@ -31,7 +28,7 @@ type tlsKeypairReloader struct {
 	keyPath   string
 }
 
-func (keyPair *tlsKeypairReloader) maybeReload() error {
+func (keyPair *tlsKeypairReloader) MaybeReload() error {
 	newCert, err := tls.LoadX509KeyPair(keyPair.certPath, keyPair.keyPath)
 	if err != nil {
 		return err
@@ -62,14 +59,5 @@ func NewTlsKeypairReloader(certPath, keyPath string) (*tlsKeypairReloader, error
 	}
 	result.cert = &cert
 
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, syscall.SIGHUP)
-		for range c {
-			if err := result.maybeReload(); err != nil {
-				glog.Fatalf("Failed to reload certificate: %v", err)
-			}
-		}
-	}()
 	return result, nil
 }

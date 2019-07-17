@@ -19,8 +19,6 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"os"
-	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/fsnotify/fsnotify"
@@ -40,11 +38,6 @@ func main() {
 	keyPair, err := webhook.NewTlsKeypairReloader(*cert, *key)
 	if err != nil {
 		glog.Fatalf("error load certificate: %s", err.Error())
-	}
-
-	proc, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		glog.Fatalf("error to get process info: %s", err.Error())
 	}
 
 	/* init API client */
@@ -91,8 +84,8 @@ func main() {
 				event.Op & fsnotify.Write == fsnotify.Remove ||
 				event.Op & fsnotify.Write == fsnotify.Write {
 				glog.Infof("modified file: %v", event.Name)
-				if err := proc.Signal(syscall.SIGHUP); err != nil {
-					glog.Fatalf("failed to send certificate update notification: %v", err)
+				if err := keyPair.MaybeReload(); err != nil {
+					glog.Fatalf("Failed to reload certificate: %v", err)
 				}
 			}
 		case err, ok := <-watcher.Errors:
