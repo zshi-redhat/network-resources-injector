@@ -79,9 +79,9 @@ func main() {
 				continue
 			}
 			glog.Infof("watcher event: %v", event)
-			if event.Op & fsnotify.Write == fsnotify.Create ||
-				event.Op & fsnotify.Write == fsnotify.Rename ||
-				event.Op & fsnotify.Write == fsnotify.Remove ||
+			if event.Op & fsnotify.Create == fsnotify.Create ||
+				event.Op & fsnotify.Rename == fsnotify.Rename ||
+				event.Op & fsnotify.Remove == fsnotify.Remove ||
 				event.Op & fsnotify.Write == fsnotify.Write {
 				glog.Infof("modified file: %v", event.Name)
 				if err := keyPair.MaybeReload(); err != nil {
